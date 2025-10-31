@@ -12,36 +12,45 @@ DETECTOR = "retinaface"
 SIMILARITY_THRESHOLD = 0.65
 
 # -----------------------------------
-# 🗄️ MongoDB Setup
+# ☁️ MongoDB Atlas Connection
 # -----------------------------------
-client = MongoClient("mongodb://localhost:27017/")
-db = client["security"]
-faces_collection = db["faces"]
+MONGO_URI = "mongodb+srv://lingojikarthikchary_db_user:GBsqnZv0Uy370M4V@cluster0.ygyedqr.mongodb.net/?appName=Cluster0"
 
-# Load stored embeddings once into RAM for speed
-print("📡 Loading criminal embeddings from MongoDB...")
-stored_faces = list(faces_collection.find({}, {"_id": 1, "name": 1, "embedding": 1}))
-if not stored_faces:
-    print("⚠️ No stored faces found. Please run the training script first.")
+try:
+    client = MongoClient(MONGO_URI)
+    db = client["security"]
+    faces_collection = db["faces"]
+    print("✅ Connected to MongoDB Atlas successfully!")
+except Exception as e:
+    print(f"❌ Failed to connect MongoDB Atlas: {e}")
     exit()
 
-print(f"✅ Loaded {len(stored_faces)} criminal profiles.\n")
+# -----------------------------------
+# 🧠 Load Stored Embeddings
+# -----------------------------------
+print("📡 Loading stored face embeddings from MongoDB Atlas...")
+stored_faces = list(faces_collection.find({}, {"_id": 1, "name": 1, "embedding": 1}))
+if not stored_faces:
+    print("⚠️ No face data found in the database. Please run your training script first.")
+    exit()
+
+print(f"✅ Loaded {len(stored_faces)} profiles from MongoDB Atlas.\n")
 
 # -----------------------------------
-# 🧠 Helper Function - Face Recognition
+# 🔍 Recognition Function
 # -----------------------------------
 def recognize_face(face_img):
     try:
-        embedding_obj = DeepFace.represent(
+        emb_obj = DeepFace.represent(
             img_path=face_img,
             model_name=MODEL_NAME,
             detector_backend=DETECTOR,
             enforce_detection=False
         )
-        if not embedding_obj:
+        if not emb_obj:
             return None, 0.0
 
-        new_embedding = np.array(embedding_obj[0]["embedding"])
+        new_embedding = np.array(emb_obj[0]["embedding"])
 
         best_match = None
         best_similarity = 0
@@ -61,18 +70,18 @@ def recognize_face(face_img):
             return None, best_similarity
 
     except Exception as e:
-        print(f"⚠️ Error: {e}")
+        print(f"⚠️ Error during recognition: {e}")
         return None, 0.0
 
 # -----------------------------------
-# 🎥 Real-time Face Detection + Recognition
+# 🎥 Real-time Recognition
 # -----------------------------------
-cap = cv2.VideoCapture(0)  # 0 for webcam, or path for CCTV stream/video file
+cap = cv2.VideoCapture(0)  # Change to video path or RTSP link for CCTV
 if not cap.isOpened():
-    print("❌ Camera not found or cannot be opened.")
+    print("❌ Cannot access camera.")
     exit()
 
-print("🚀 Starting real-time face recognition...")
+print("🚀 Starting real-time face recognition... Press 'q' to quit.")
 time.sleep(2)
 
 while True:
@@ -80,7 +89,6 @@ while True:
     if not ret:
         break
 
-    # Detect all faces in frame using DeepFace backend
     detections = DeepFace.extract_faces(
         img_path=frame,
         detector_backend=DETECTOR,
@@ -98,22 +106,18 @@ while True:
 
         face_crop = frame[y:y+h, x:x+w]
 
-        # Recognize face
         name, similarity = recognize_face(face_crop)
 
         if name:
-            color = (0, 0, 255)  # Red for criminal
+            color = (0, 0, 255)  # Red = match found
             label = f"{name} ({similarity:.2f})"
         else:
-            color = (0, 255, 0)  # Green for unknown
+            color = (0, 255, 0)  # Green = unknown
             label = f"Unknown ({similarity:.2f})"
 
-        # Draw box and label
         cv2.rectangle(frame, (x, y), (x+w, y+h), color, 2)
-        cv2.putText(
-            frame, label, (x, y-10),
-            cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2
-        )
+        cv2.putText(frame, label, (x, y-10),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
 
     cv2.imshow("🚨 Real-time Face Recognition", frame)
 
@@ -122,4 +126,4 @@ while True:
 
 cap.release()
 cv2.destroyAllWindows()
-print("🛑 Stopped.")
+print("🛑 Recognition stopped.")

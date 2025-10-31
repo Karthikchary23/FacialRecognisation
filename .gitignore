@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+
+# Virtual environment
+venv/
+.venv/
+Lib/
+Scripts/
+bin/
+Include/
+
+# IDEs
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data and models
+*.h5
+*.pkl
+*.ckpt
+*.weights
+*.dll
+*.so
+
+# DeepFace cache
+deepface/
